@@ -28,16 +28,9 @@ def getUserImages(request):
 @permission_classes([IsAuthenticated])
 def uploadImageFile(request):
     print(f"Saving image! User: {request.user}")
-    # print(type(request.user))
-    # user = UserData.objects.get(request.user.id)
-    # print(user)
-    # if not user:
-    #     raise Exception("No user!")
-    # print(request.data["url"])
     print(f"data: {request.data['image'][:100]}")
     base64Str = request.data["image"].split(',')[1]
     imageBytes = io.BytesIO(base64.decodebytes(bytes(base64Str, "utf-8")))
-    # img = Image.open(imageBytes)
     imgFile = ImageFile(imageBytes, f'{uuid.uuid4()}.png')
     imgModel = ImageModel.objects.create(
         owner=request.user,
