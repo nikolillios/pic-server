@@ -2,28 +2,15 @@ import images.models as image_models
 import numpy as np
 from PIL import Image
 
-def getImagesByUserID(user_id):
+def getImagesByUserID(user):
     images = image_models.ImageModel.objects.filter(
-        owner=user_id)
+        owner=user)
     print(images)
-    return [image._id for image in images]
-
-def saveImageModel(user_id, image_url):
-    image = image_models.ImageModel(
-        owner = user_id,
-        url = image_url,
-    )
-    image.save()
-    print(image_models.ImageModel.objects.all())
+    type(images)
+    return [image.id for image in images]
 
 def userImagesDirPath(instance, filename):
     return 'user_{0}/{1}'.format(instance.owner.id, filename)
-
-# def getImageById(image_id):
-#     # TODO: download from cloud and return]
-#     img = Image.open('../test_images/MD_fam.jpeg')
-#     print(img)
-#     return img
 
 def findClosestE6PaletteColor(pixel):
     colors = np.array([[1, 1, 1], [0, 0, 0], [1, 1, 0], [1, 0, 0], [0, 0, 1], [0, 0, 1]])
