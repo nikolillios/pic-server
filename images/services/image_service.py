@@ -15,6 +15,9 @@ def userImagesDirPath(instance, filename):
 def ditheredImagesDirPath(instance, filename):
     return 'user_{0}/dithered/{1}'.format(instance.owner.id, filename)
 
+def imageFromBytes(bytes):
+    imageBytes = io.BytesIO(base64.decodebytes(bytes(base64Str, "utf-8")))
+
 def findClosestE6PaletteColor(pixel):
     colors = np.array([[1, 1, 1], [0, 0, 0], [1, 1, 0], [1, 0, 0], [0, 0, 1], [0, 0, 1]])
     minDist = float('inf')
@@ -46,7 +49,7 @@ def ditherFloydSteinberg(image):
                 image[i+1, j] = image[i+1, j] + quantErr * 5/16
                 if j > 0:
                     image[i+1, j-1] = image[i+1, j-1] + quantErr * 3/16
-    return Image.fromarray(np.array(image, dtype=np.uint8))
+    return Image.fromarray(np.array(image*255, dtype=np.uint8))
 
 def ditherAtkinson(image):
     image = np.divide(image, 255)
@@ -68,7 +71,7 @@ def ditherAtkinson(image):
                     image[i+1, j-1] = image[i+1, j-1] + quantErr * 1/8
                 if i < shape[0] - 2:
                     image[i+2, j] = image[i+2, j] + quantErr * 1/8
-    return Image.fromarray(np.array(image, dtype=np.uint8))
+    return Image.fromarray(np.array(image*255, dtype=np.uint8))
 
 
 def testDitherFloydSteinberg():
@@ -78,11 +81,11 @@ def testDitherFloydSteinberg():
     # print(imArr.shape)
     # print(imArr)
     dithered = ditherFloydSteinberg(imArr)
-    print(dithered.shape)
-    ditheredImage = Image.fromarray(np.array(dithered*255, dtype=np.uint8))
-    ditheredImage.show()
+    ditheredImage = Image.fromarray(np.array(dithered, dtype=np.uint8))
+    dithered.show()
     atkinsDithered = ditherAtkinson(np.array(image))
-    atkinsIm = Image.fromarray(np.array(atkinsDithered*255, dtype=np.uint8))
-    atkinsIm.show()
-    ditheredImage.save('/Users/nikolillios/picturesque/repos/server/test_images/floydSteinbergRheeFam.bmp')
-    atkinsIm.save('/Users/nikolillios/picturesque/repos/server/test_images/atkinsonRheeFam.bmp')
+    # atkinsIm = Image.fromarray(np.array(atkinsDithered, dtype=np.uint8))
+    # atkinsIm.show()
+    atkinsDithered.show()
+    # ditheredImage.save('/Users/nikolillios/picturesque/repos/server/test_images/floydSteinbergRheeFam.bmp')
+    # atkinsIm.save('/Users/nikolillios/picturesque/repos/server/test_images/atkinsonRheeFam.bmp')

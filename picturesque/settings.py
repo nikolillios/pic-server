@@ -36,7 +36,7 @@ SECRET_KEY = 'django-insecure-u$-foa!ycn^z5n29t5m&1+k2s!vz&c4w0j*uimwyqpp67*hjrg
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['10.0.0.172', '*']
 
 
 # Application definition
@@ -216,3 +216,10 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Celery Configuration
+# CELERY_BROKER_URL = 'pyamqp://niko:Monkeybrains09@localhost:5672/myhost.local'
+CELERY_BROKER_URL = 'pyamqp://localhost'
+# CELERY_RESULT_BACKEND = 'rpc://'
+CELERY_TIMEZONE = "Australia/Tasmania"
+CELERY_TASK_TIME_LIMIT = 30 * 60
