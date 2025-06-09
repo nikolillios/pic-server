@@ -71,7 +71,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=180),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=50),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -223,3 +223,4 @@ CELERY_BROKER_URL = 'pyamqp://localhost'
 # CELERY_RESULT_BACKEND = 'rpc://'
 CELERY_TIMEZONE = "Australia/Tasmania"
 CELERY_TASK_TIME_LIMIT = 30 * 60
+

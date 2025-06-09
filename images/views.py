@@ -4,6 +4,7 @@ from django.core.files.base import ContentFile
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -12,8 +13,8 @@ import io, base64
 import numpy as np
 import uuid
 from PIL import Image
-from .models import ImageModel, DitheredImageModel
-from .serializers import ImageSerializer
+from .models import *
+from .serializers import ImageSerializer, ImageCollectionSerializer
 from .services.image_service import getImagesByUserID, ditherAtkinson
 from .tasks import ditherImageFromBytesAndSave
 
@@ -33,29 +34,80 @@ def getUserImages(request):
 @csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def getDitheredImagesByDims(request, height, width):
-    if not height or not width:
-        return Response("Must provide dimensions are request param.")
-    dithModels = request.user.ditheredimagemodel_set.all()
+def getCollections(request):
+    collections = ImageCollection.objects.filter(owner=request.user)
+    return Response(ImageCollectionSerializer(collections, many=True).data)
+
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def getDeviceCollections(request, device_id):
+    collections = ImageCollection.objects.filter(owner=request.user).filter(device_model=device_id)
+    print(collections)
+    return Response(ImageCollectionSerializer(collections, many=True).data)
+
+@csrf_exempt
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_image(request, id):
+    try:
+        im = ImageModel.objects.get(id=id)
+    except ImageModel.DoesNotExist:
+        return Response({"error": "Image not found"})
+    im.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def getDitheredImagesByCollection(request, collection_id):
+    collection = ImageCollection.objects.get(id=collection_id)
     res_data = {}
-    for image_instance in dithModels:
-        
-        res_data[f'{image_instance.image.url.split('/')[-1]}'] = {
-            "data": base64.b64encode(image_instance.image.read()).decode(),
+    for dith in collection.dithered_images.all():
+        res_data[dith.id] = {
+            "data": base64.b64encode(dith.image.read()).decode(),
             "mime_type": 'image/bmp'
         }
-        im = Image.open(image_instance.image)
-        im.show()
-        resized = im.resize((800, 400))
-        resized.show()
-        print(im.size)
+        # im = Image.open(dith.image)
+        # im.show()
+        # print(im.size)
     return JsonResponse(res_data)
+
+def get_image_str_from_b64_url(url):
+    return url.split(',')[1]
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def uploadImageToCollection(request):
+    base64Str = get_image_str_from_b64_url(request.data["image_url"])
+    imageBytes = io.BytesIO(base64.decodebytes(bytes(base64Str, "utf-8")))
+    imgFile = ImageFile(imageBytes, f'{uuid.uuid4()}.png')
+
+    imgModel = ImageModel.objects.create(
+        owner=request.user,
+        image=imgFile,
+    )
+
+    collection = ImageCollection.objects.get(id=request.data["collection_id"])
+    collection.images.add(imgModel)
+
+    # Scale image and convert to 3 channel RGB
+    image = Image.open(imageBytes).convert('RGB').resize(MODEL_TO_SIZE[collection.device_model])
+    buffered = io.BytesIO()
+    image.save(buffered, format="jpeg")
+    resized_b64_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+    # Call celery task to dither async
+    ditherImageFromBytesAndSave.delay(resized_b64_str, request.user.id, imgModel.id, collection.id)
+    return HttpResponse("Successfully received image")
+
 
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def uploadImageFile(request):
-    base64Str = request.data["image"].split(',')[1]
+    base64Str = get_image_str_from_b64_url(request.data["image"])
     imageBytes = io.BytesIO(base64.decodebytes(bytes(base64Str, "utf-8")))
     imgFile = ImageFile(imageBytes, f'{uuid.uuid4()}.png')
 
@@ -82,7 +134,18 @@ def uploadImageFile(request):
         image=dithered_file
         # image=ImageFile(dithered_file, f'{uuid.uuid4()}.bmp')
     )
-    im = Image.open(dithered_io)
-    im.show()
     # ditherImageFromBytesAndSave.delay(base64Str, request.user.id, imgModel.id)
     return HttpResponse("Successfully received image")
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def createCollection(request):
+    data = request.data
+    user = request.user
+    collection = ImageCollection.objects.create(
+        name = data["collection_name"],
+        owner = user,
+        device_model = int(data["model"])
+    )
+    return Response(ImageCollectionSerializer(collection).data)
