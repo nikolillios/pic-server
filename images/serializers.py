@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ImageModel, ImageCollection
+from .models import ImageModel, ImageCollection, DisplayDeviceConfig
 
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -11,3 +11,7 @@ class ImageCollectionSerializer(serializers.ModelSerializer):
         model = ImageCollection
         fields = '__all__'
 
+class DisplayDeviceConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DisplayDeviceConfig
+        fields = '__all__'

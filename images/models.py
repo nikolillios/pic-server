@@ -29,7 +29,7 @@ MODEL_TO_SIZE = {
 }
 
 class ImageCollection(models.Model):
-    name = models.CharField(max_length=20)
+    name = models.CharField(max_length=36)
     owner = models.ForeignKey(acc_models.UserData, on_delete=models.CASCADE)
     images = models.ManyToManyField(ImageModel)
     dithered_images = models.ManyToManyField(DitheredImageModel)
@@ -38,3 +38,10 @@ class ImageCollection(models.Model):
     def validate_unique(self, exclude=None):
         if ImageCollection.objects.filter(name=self.name).exists():
             raise ValidationError('Names must be unique')
+
+class DisplayDeviceConfig(models.Model):
+    name = models.CharField(max_length=30)
+    owner = models.ForeignKey(acc_models.UserData, on_delete=models.CASCADE)
+    serial_id = models.CharField(max_length=16)
+    device_model = models.IntegerField(choices=SupportedEPaper, null=True)
+    collection = models.ForeignKey(ImageCollection, on_delete=models.SET_NULL, null=True)

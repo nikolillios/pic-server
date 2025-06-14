@@ -14,7 +14,7 @@ import numpy as np
 import uuid
 from PIL import Image
 from .models import *
-from .serializers import ImageSerializer, ImageCollectionSerializer
+from .serializers import ImageSerializer, ImageCollectionSerializer, DisplayDeviceConfigSerializer
 from .services.image_service import getImagesByUserID, ditherAtkinson
 from .tasks import ditherImageFromBytesAndSave
 
@@ -149,3 +149,40 @@ def createCollection(request):
         device_model = int(data["model"])
     )
     return Response(ImageCollectionSerializer(collection).data)
+
+
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def getConfigForDevice(request, serial):
+    device_config = DisplayDeviceConfig.objects.filter(serial_id=serial)
+    if device_config.exists():
+        return Response(DisplayDeviceConfigSerializer(device_config.first()).data)
+    else:
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def createConfigForDevice(request):
+    try:
+        print(request.data)
+        print(type(request.data))
+        print(request.user.id)
+        if not request.data["collection_id"]:
+            raise Exception("No collection id given")
+        collection_id = int(request.data["collection_id"])
+        config_collection = ImageCollection.objects.get(id=collection_id)
+        if not config_collection:
+            raise Exception(f'No matching config for {collection_id}')
+        config = DisplayDeviceConfig.objects.create(
+            name = request.data["device_name"],
+            owner = request.user,
+            serial_id = request.data["serial"],
+            device_model = int(request.data["device_model"]),
+            collection = config_collection,
+        )
+        return Response(DisplayDeviceConfigSerializer(config).data)
+    except Exception as e:
+        print(e)
+        return Response(f'Error: {e}', status=status.HTTP_400_BAD_REQUEST)
