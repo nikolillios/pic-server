@@ -5,8 +5,6 @@ from PIL import Image
 def getImagesByUserID(user):
     images = image_models.ImageModel.objects.filter(
         owner=user)
-    print(images)
-    type(images)
     return [image.id for image in images]
 
 def userImagesDirPath(instance, filename):
