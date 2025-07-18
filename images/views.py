@@ -93,7 +93,7 @@ def uploadImageToCollection(request):
 
         # Call celery task to dither async
         ditherImageFromBytesAndSave.delay(resized_b64_str, request.user.id, imgModel.id, collection.id)
-        return HttpResponse("Successfully received image")
+        return Response(ImageSerializer(imgModel).data)
     except Exception as e:
         return HttpResponse(f'Error adding image to collection: {e}', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -131,7 +131,7 @@ def uploadImageFile(request):
             # image=ImageFile(dithered_file, f'{uuid.uuid4()}.bmp')
         )
         ditherImageFromBytesAndSave.delay(base64Str, request.user.id, imgModel.id)
-        return HttpResponse("Successfully received image")
+        return Response(ImageSerializer(imgModel).data)
     except Exception as e:
         return HttpResponse(f'Error uploading image: {e}', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
