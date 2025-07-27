@@ -49,8 +49,9 @@ def delete_image(request, id):
         im = ImageModel.objects.get(id=id)
     except ImageModel.DoesNotExist:
         return Response({"error": "Image not found"})
+    res = Response(ImageSerializer(im).data)
     im.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
+    return res
 
 @csrf_exempt
 @api_view(['GET'])
@@ -133,6 +134,7 @@ def uploadImageFile(request):
         ditherImageFromBytesAndSave.delay(base64Str, request.user.id, imgModel.id)
         return Response(ImageSerializer(imgModel).data)
     except Exception as e:
+        print(f'Error while uploading photo: {e}')
         return HttpResponse(f'Error uploading image: {e}', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @csrf_exempt
@@ -158,6 +160,35 @@ def getConfigForDevice(request, serial):
         return Response(DisplayDeviceConfigSerializer(device_config.first()).data)
     else:
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def getDeviceConfigs(request):
+    device_configs = DisplayDeviceConfig.objects.filter(owner=request.user.id)
+    return Response(DisplayDeviceConfigSerializer(device_configs, many=True).data)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def updateConfigForDevice(request):
+    try:
+        config = DisplayDeviceConfig.objects.get(id=request.data["config_id"])
+        if not config:
+            raise Exception("No matching config")
+        if "collection_id" in request.data:
+            collection = ImageCollection.objects.get(id=request.data["collection_id"])
+            if not collection:
+                raise Exception("No matching collection")
+            if collection.id == config.collection:
+                raise Exception("Cannot change to the same collection")
+            config.collection = collection
+        if "device_name" in request.data:
+            config.device_name = request.data["device_name"]
+        config.save()
+        return Response(DisplayDeviceConfigSerializer(config).data)
+    except Exception as e:
+        return Response(f'Error: {e}', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @csrf_exempt
 @api_view(['POST'])

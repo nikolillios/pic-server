@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 import account.models as acc_models
 from .services.image_service import userImagesDirPath, ditheredImagesDirPath
 
