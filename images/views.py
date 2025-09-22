@@ -57,14 +57,19 @@ def delete_image(request, id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def getDitheredImagesByCollection(request, collection_id):
-    collection = ImageCollection.objects.get(id=collection_id)
-    res_data = {}
-    for dith in collection.dithered_images.all():
-        res_data[dith.id] = {
-            "data": base64.b64encode(dith.image.read()).decode(),
-            "mime_type": 'image/bmp'
-        }
-    return JsonResponse(res_data)
+    try:
+        collection = ImageCollection.objects.get(id=collection_id, owner=request.user)
+        res_data = {}
+        for dith in collection.dithered_images.all():
+            res_data[dith.id] = {
+                "data": base64.b64encode(dith.image.read()).decode(),
+                "mime_type": 'image/bmp'
+            }
+        return JsonResponse(res_data)
+    except ImageCollection.DoesNotExist:
+        return Response({"error": "Collection not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 def get_image_str_from_b64_url(url):
     return url.split(',')[1]
@@ -74,6 +79,9 @@ def get_image_str_from_b64_url(url):
 @permission_classes([IsAuthenticated])
 def uploadImageToCollection(request):
     try:
+        if not request.data.get("image_url") or not request.data.get("collection_id"):
+            return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
+            
         base64Str = get_image_str_from_b64_url(request.data["image_url"])
         imageBytes = io.BytesIO(base64.decodebytes(bytes(base64Str, "utf-8")))
         imgFile = ImageFile(imageBytes, f'{uuid.uuid4()}.png')
@@ -83,7 +91,7 @@ def uploadImageToCollection(request):
             image=imgFile,
         )
 
-        collection = ImageCollection.objects.get(id=request.data["collection_id"])
+        collection = ImageCollection.objects.get(id=request.data["collection_id"], owner=request.user)
         collection.images.add(imgModel)
 
         # Scale image and convert to 3 channel RGB
@@ -95,8 +103,12 @@ def uploadImageToCollection(request):
         # Call celery task to dither async
         ditherImageFromBytesAndSave.delay(resized_b64_str, request.user.id, imgModel.id, collection.id)
         return Response(ImageSerializer(imgModel).data)
+    except ImageCollection.DoesNotExist:
+        return Response({"error": "Collection not found"}, status=status.HTTP_404_NOT_FOUND)
+    except (ValueError, KeyError) as e:
+        return Response({"error": "Invalid data format"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return HttpResponse(f'Error adding image to collection: {e}', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @csrf_exempt
@@ -141,14 +153,20 @@ def uploadImageFile(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def createCollection(request):
-    data = request.data
-    user = request.user
-    collection = ImageCollection.objects.create(
-        name = data["collection_name"],
-        owner = user,
-        device_model = int(data["model"])
-    )
-    return Response(ImageCollectionSerializer(collection).data)
+    try:
+        if not request.data.get("collection_name") or not request.data.get("model"):
+            return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        collection = ImageCollection.objects.create(
+            name=request.data["collection_name"],
+            owner=request.user,
+            device_model=int(request.data["model"])
+        )
+        return Response(ImageCollectionSerializer(collection).data)
+    except ValueError:
+        return Response({"error": "Invalid model value"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @csrf_exempt
@@ -173,41 +191,51 @@ def getDeviceConfigs(request):
 @permission_classes([IsAuthenticated])
 def updateConfigForDevice(request):
     try:
-        config = DisplayDeviceConfig.objects.get(id=request.data["config_id"])
-        if not config:
-            raise Exception("No matching config")
+        if not request.data.get("config_id"):
+            return Response({"error": "Missing config_id"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        config = DisplayDeviceConfig.objects.get(id=request.data["config_id"], owner=request.user)
+        
         if "collection_id" in request.data:
-            collection = ImageCollection.objects.get(id=request.data["collection_id"])
-            if not collection:
-                raise Exception("No matching collection")
-            if collection.id == config.collection:
-                raise Exception("Cannot change to the same collection")
+            collection = ImageCollection.objects.get(id=request.data["collection_id"], owner=request.user)
+            if collection.id == config.collection_id:
+                return Response({"error": "Cannot change to the same collection"}, status=status.HTTP_400_BAD_REQUEST)
             config.collection = collection
+            
         if "device_name" in request.data:
-            config.device_name = request.data["device_name"]
+            config.name = request.data["device_name"]
+            
         config.save()
         return Response(DisplayDeviceConfigSerializer(config).data)
+    except DisplayDeviceConfig.DoesNotExist:
+        return Response({"error": "Config not found"}, status=status.HTTP_404_NOT_FOUND)
+    except ImageCollection.DoesNotExist:
+        return Response({"error": "Collection not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
-        return Response(f'Error: {e}', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def createConfigForDevice(request):
     try:
-        if not request.data["collection_id"]:
-            raise Exception("No collection id given")
-        collection_id = int(request.data["collection_id"])
-        config_collection = ImageCollection.objects.get(id=collection_id)
-        if not config_collection:
-            raise Exception(f'No matching config for {collection_id}')
+        required_fields = ["collection_id", "device_name", "serial", "device_model"]
+        for field in required_fields:
+            if not request.data.get(field):
+                return Response({"error": f"Missing required field: {field}"}, status=status.HTTP_400_BAD_REQUEST)
+                
+        collection = ImageCollection.objects.get(id=request.data["collection_id"], owner=request.user)
         config = DisplayDeviceConfig.objects.create(
-            name = request.data["device_name"],
-            owner = request.user,
-            serial_id = request.data["serial"],
-            device_model = int(request.data["device_model"]),
-            collection = config_collection,
+            name=request.data["device_name"],
+            owner=request.user,
+            serial_id=request.data["serial"],
+            device_model=int(request.data["device_model"]),
+            collection=collection,
         )
         return Response(DisplayDeviceConfigSerializer(config).data)
+    except ImageCollection.DoesNotExist:
+        return Response({"error": "Collection not found"}, status=status.HTTP_404_NOT_FOUND)
+    except ValueError:
+        return Response({"error": "Invalid numeric value"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return Response(f'Error: {e}', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
