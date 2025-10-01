@@ -16,7 +16,7 @@ import uuid
 from PIL import Image
 from .models import *
 from .serializers import ImageSerializer, ImageCollectionSerializer, DisplayDeviceConfigSerializer
-from .services.image_service import getImagesByUserID, ditherAtkinson
+from .services.image_service import ditherAtkinson
 from .tasks import ditherImageFromBytesAndSave
 
 # Create your views here.
@@ -24,8 +24,26 @@ from .tasks import ditherImageFromBytesAndSave
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def getUserImages(request):
-    imgModels = request.user.imagemodel_set.all()
-    serializer = ImageSerializer(imgModels, many=True)
+    # Get pagination parameters, if any
+    page = request.query_params.get('page', None)
+    page_size = request.query_params.get('page_size', None)
+
+    user_images_qs = request.user.imagemodel_set.all().order_by('-id')
+
+    if page is not None and page_size is not None:
+        try:
+            page = int(page)
+            page_size = int(page_size)
+            if page < 1 or page_size < 1:
+                raise ValueError
+            start = (page - 1) * page_size
+            end = start + page_size
+            # Use queryset slicing to avoid loading all objects
+            user_images_qs = user_images_qs[start:end]
+        except (ValueError, TypeError):
+            return Response({"error": "Invalid pagination parameters"}, status=status.HTTP_400_BAD_REQUEST)
+
+    serializer = ImageSerializer(user_images_qs, many=True)
     return Response(serializer.data)
 
 @csrf_exempt
