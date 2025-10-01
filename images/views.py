@@ -4,6 +4,7 @@ from django.core.files.base import ContentFile
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
@@ -86,13 +87,14 @@ def uploadImageToCollection(request):
         imageBytes = io.BytesIO(base64.decodebytes(bytes(base64Str, "utf-8")))
         imgFile = ImageFile(imageBytes, f'{uuid.uuid4()}.png')
 
-        imgModel = ImageModel.objects.create(
-            owner=request.user,
-            image=imgFile,
-        )
+        with transaction.atomic():
+            imgModel = ImageModel.objects.create(
+                owner=request.user,
+                image=imgFile,
+            )
 
-        collection = ImageCollection.objects.get(id=request.data["collection_id"], owner=request.user)
-        collection.images.add(imgModel)
+            collection = ImageCollection.objects.get(id=request.data["collection_id"], owner=request.user)
+            collection.images.add(imgModel)
 
         # Scale image and convert to 3 channel RGB
         image = Image.open(imageBytes).convert('RGB').resize(MODEL_TO_SIZE[collection.device_model])
