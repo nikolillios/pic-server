@@ -259,3 +259,27 @@ def createConfigForDevice(request):
         return Response({"error": "Invalid numeric value"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def getRandomImages(request):
+    try:
+        # Get count parameter, default to 10, cap at 50
+        count = int(request.query_params.get('count', 10))
+        count = min(max(count, 1), 50)  # Ensure count is between 1 and 50
+        
+        # Get all user's images using the reverse relationship
+        user_images = request.user.imagemodel_set.all()
+        
+        if not user_images.exists():
+            return Response([])
+        
+        # Use order_by('?') for random ordering and limit to count
+        random_images = user_images.order_by('?')[:count]
+        
+        return Response(ImageSerializer(random_images, many=True).data)
+    except ValueError:
+        return Response({"error": "Invalid count parameter"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
