@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import RegisterView, LogoutView
+from .views import RegisterView, LogoutView, register_pi
 
 
 urlpatterns = [
@@ -9,4 +9,5 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('register/', RegisterView.as_view(), name='register'),
     path('logout/', LogoutView.as_view(), name='logout'),
+    path('pi/register/', register_pi, name='pi-register'),
 ]
