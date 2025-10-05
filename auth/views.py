@@ -31,14 +31,16 @@ class LogoutView(APIView):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_pi(request):
-    """Pi registration endpoint - no auth required"""
+    """
+    Pi registration endpoint - no auth required.
+    """
     serial_id = request.data.get('serial_id')
     public_key = request.data.get('public_key')
     pairing_code = request.data.get('pairing_code')
     
     if not all([serial_id, public_key, pairing_code]):
         return Response(
-            {'error': 'Missing required fields'},
+            {'error': 'Missing required fields: serial_id, public_key, pairing_code'},
             status=status.HTTP_400_BAD_REQUEST
         )
     
@@ -49,14 +51,60 @@ def register_pi(request):
             status=status.HTTP_409_CONFLICT
         )
     
-    pi = RaspberryPi.objects.create(
+    # Create Pi with hashed pairing code
+    pi = RaspberryPi(
         serial_id=serial_id,
         public_key=public_key,
-        pairing_code=pairing_code,
         is_paired=False
     )
+    pi.set_pairing_code(pairing_code)  # Hash it
+    pi.save()
     
-    return Response(
-        {'message': 'Device registered successfully'},
-        status=status.HTTP_201_CREATED
-    )
+    return Response({
+        'message': 'Device registered successfully',
+    }, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def pair_pi(request):
+    """
+    User pairs a Pi to their account using serial ID and pairing code.
+    The pairing code is NOT cleared after pairing - it can be reused.
+    """
+    serial_id = request.data.get('serial_id')
+    pairing_code = request.data.get('pairing_code')
+    
+    if not serial_id or not pairing_code:
+        return Response(
+            {'error': 'Serial ID and pairing code are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Device must not already be paired
+        pi = RaspberryPi.objects.get(serial_id=serial_id, is_paired=False)
+    except RaspberryPi.DoesNotExist:
+        return Response(
+            {'error': 'Invalid serial ID or device already paired'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Verify pairing code against hash
+    if not pi.check_pairing_code(pairing_code):
+        return Response(
+            {'error': 'Invalid pairing code'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    # Pair the device - pairing_code remains in database (hashed)
+    pi.owner = request.user
+    pi.is_paired = True
+    pi.save()
+    
+    # TODO: Send email notification
+    # send_device_paired_email(request.user, pi.serial_id)
+    
+    return Response({
+        'message': 'Device paired successfully',
+        'serial_id': pi.serial_id
+    })
