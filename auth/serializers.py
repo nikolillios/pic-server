@@ -13,5 +13,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class RaspberryPiSerializer(serializers.ModelSerializer):
     class Meta:
         model = RaspberryPi
-        fields = ['serial_id', 'is_active', 'is_paired', 'created_at', 'last_seen']
+        fields = [
+            'serial_id', 'is_active', 'is_paired', 'created_at', 'last_seen',
+            'display_name', 'device_model', 'collection'
+        ]
         read_only_fields = ['serial_id', 'created_at', 'last_seen']

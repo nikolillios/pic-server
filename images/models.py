@@ -29,6 +29,12 @@ MODEL_TO_SIZE = {
     SupportedEPaper.EPD13IN3: (1600, 1200),
 }
 
+MODEL_TO_NAME = {
+    SupportedEPaper.EPD4IN0: "4inch E-Paper",
+    SupportedEPaper.EPD7IN3: "7.3inch E-Paper",
+    SupportedEPaper.EPD13IN3: "13.3inch E-Paper",
+}
+
 class ImageCollection(models.Model):
     name = models.CharField(max_length=36)
     owner = models.ForeignKey(acc_models.UserData, on_delete=models.CASCADE)
