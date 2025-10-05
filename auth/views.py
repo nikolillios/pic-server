@@ -108,3 +108,33 @@ def pair_pi(request):
         'message': 'Device paired successfully',
         'serial_id': pi.serial_id
     })
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def unpair_pi(request, serial_id):
+    """
+    User can unpair their Pi.
+    The pairing code remains valid - same code can be used to re-pair.
+    """
+    try:
+        pi = RaspberryPi.objects.get(serial_id=serial_id, owner=request.user)
+    except RaspberryPi.DoesNotExist:
+        return Response(
+            {'error': 'Device not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    pi.owner = None
+    pi.is_paired = False
+    pi.is_active = True  # Reset to active for next pairing
+    pi.display_name = pi.serial_id  # Reset display name to serial_id for next user
+    pi.collection = None  # Clear the associated collection
+    # pairing_code is NOT cleared - it remains valid for re-pairing
+    pi.save()
+    
+    # Optional: Send email notification
+    # send_device_unpaired_email(request.user, pi.serial_id)
+    
+    return Response({
+        'message': 'Device unpaired successfully. Same pairing code can be used to re-pair.'
+    })
