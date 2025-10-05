@@ -1,4 +1,4 @@
-from .views import getUserImages, uploadImageFile, getDitheredImagesByCollection, createCollection, getCollections, uploadImageToCollection, getDeviceCollections, delete_image, getConfigForDevice, createConfigForDevice, getDeviceConfigs, updateConfigForDevice, getRandomImages, get_user_displays, updateDisplay
+from .views import getUserImages, uploadImageFile, getDitheredImagesByCollection, createCollection, getCollections, uploadImageToCollection, getDeviceCollections, delete_image, getConfigForDevice, createConfigForDevice, getDeviceConfigs, updateConfigForDevice, getRandomImages, get_user_displays, updateDisplay, get_dithered_images
 from django.urls import path, include
 
 urlpatterns = [
@@ -16,6 +16,7 @@ urlpatterns = [
     path('createConfigForDevice/', createConfigForDevice, name="createConfigForDevice"),
     path('updateDeviceConfig/', updateConfigForDevice, name='updateDeviceConfig'),
     path('displays/', get_user_displays, name='get-user-displays'),
-    path('displays/update/', updateDisplay, name='update-display')
+    path('displays/update/', updateDisplay, name='update-display'),
+    path('getDitheredImages/<int:collection_id>', get_dithered_images, name='getDitheredImages'),
 ]
 

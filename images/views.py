@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
 from account.models import UserData
 import io, base64
@@ -18,6 +18,7 @@ from .models import *
 from .serializers import ImageSerializer, ImageCollectionSerializer, DisplayDeviceConfigSerializer
 from auth.models import RaspberryPi
 from auth.serializers import RaspberryPiSerializer
+from auth.authentication import PiAuthentication
 from .services.image_service import ditherAtkinson
 from .tasks import ditherImageFromBytesAndSave
 
@@ -326,6 +327,30 @@ def updateDisplay(request):
         return Response(RaspberryPiSerializer(pi).data)
     except RaspberryPi.DoesNotExist:
         return Response({"error": "Raspberry Pi not found"}, status=status.HTTP_404_NOT_FOUND)
+    except ImageCollection.DoesNotExist:
+        return Response({"error": "Collection not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@authentication_classes([PiAuthentication])
+@permission_classes([IsAuthenticated])
+def get_dithered_images(request, collection_id):
+    """
+    Endpoint for Pis to get dithered images from a specific collection.
+    request.user = the owner User
+    """
+    try:
+        user = request.user
+        
+        collection = ImageCollection.objects.get(id=collection_id, owner=user)
+        res_data = {}
+        for dith in collection.dithered_images.all():
+            res_data[dith.id] = {
+                "data": base64.b64encode(dith.image.read()).decode(),
+                "mime_type": 'image/bmp'
+            }
+        return JsonResponse(res_data)
     except ImageCollection.DoesNotExist:
         return Response({"error": "Collection not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
