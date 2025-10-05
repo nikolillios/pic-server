@@ -299,3 +299,34 @@ def get_user_displays(request):
         return Response(serializer.data)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def updateDisplay(request):
+    """
+    Update display name and/or collection.
+    """
+    try:
+        if not request.data.get("serial_id"):
+            return Response({"error": "Missing serial_id"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        pi = RaspberryPi.objects.get(serial_id=request.data["serial_id"], owner=request.user)
+        
+        if "collection_id" in request.data:
+            collection = request.user.imagecollection_set.get(id=request.data["collection_id"])
+            if collection.id == pi.collection_id:
+                return Response({"error": "Cannot change to the same collection"}, status=status.HTTP_400_BAD_REQUEST)
+            pi.collection = collection
+            
+        if "display_name" in request.data:
+            pi.display_name = request.data["display_name"]
+            
+        pi.save()
+        return Response(RaspberryPiSerializer(pi).data)
+    except RaspberryPi.DoesNotExist:
+        return Response({"error": "Raspberry Pi not found"}, status=status.HTTP_404_NOT_FOUND)
+    except ImageCollection.DoesNotExist:
+        return Response({"error": "Collection not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
