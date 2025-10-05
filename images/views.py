@@ -16,6 +16,8 @@ import uuid
 from PIL import Image
 from .models import *
 from .serializers import ImageSerializer, ImageCollectionSerializer, DisplayDeviceConfigSerializer
+from auth.models import RaspberryPi
+from auth.serializers import RaspberryPiSerializer
 from .services.image_service import ditherAtkinson
 from .tasks import ditherImageFromBytesAndSave
 
@@ -281,5 +283,19 @@ def getRandomImages(request):
         return Response(ImageSerializer(random_images, many=True).data)
     except ValueError:
         return Response({"error": "Invalid count parameter"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_displays(request):
+    """
+    Get all paired Raspberry Pi displays for the authenticated user.
+    """
+    try:
+        displays = request.user.raspberrypi_set.filter(is_paired=True)
+        serializer = RaspberryPiSerializer(displays, many=True)
+        return Response(serializer.data)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
