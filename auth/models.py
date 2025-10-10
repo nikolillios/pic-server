@@ -1,10 +1,7 @@
 from django.db import models
 from account.models import UserData
 from images.models import SupportedEPaper, ImageCollection, MODEL_TO_NAME
-<<<<<<< HEAD
 from django.contrib.auth.hashers import make_password, check_password
-=======
->>>>>>> c65fa36 (Add device configuration info to RasberryPi model)
 
 class RaspberryPi(models.Model):
     serial_id = models.CharField(max_length=100, unique=True, db_index=True)
