@@ -15,7 +15,7 @@ import numpy as np
 import uuid
 from PIL import Image
 from .models import *
-from .serializers import ImageSerializer, ImageCollectionSerializer, DisplayDeviceConfigSerializer
+from .serializers import ImageSerializer, ImageCollectionSerializer, DisplayDeviceConfigSerializer, RasberryPiSerializer
 from auth.models import RaspberryPi
 from auth.serializers import RaspberryPiSerializer
 from auth.authentication import PiAuthentication
@@ -77,6 +77,7 @@ def delete_image(request, id):
 
 @csrf_exempt
 @api_view(['GET'])
+@authentication_classes([PiAuthentication])
 @permission_classes([IsAuthenticated])
 def getDitheredImagesByCollection(request, collection_id):
     try:
@@ -201,13 +202,6 @@ def getConfigForDevice(request, serial):
         return Response(DisplayDeviceConfigSerializer(device_config.first()).data)
     else:
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-@csrf_exempt
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def getDeviceConfigs(request):
-    device_configs = DisplayDeviceConfig.objects.filter(owner=request.user.id)
-    return Response(DisplayDeviceConfigSerializer(device_configs, many=True).data)
 
 @csrf_exempt
 @api_view(['POST'])
@@ -353,5 +347,20 @@ def get_dithered_images(request, collection_id):
         return JsonResponse(res_data)
     except ImageCollection.DoesNotExist:
         return Response({"error": "Collection not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@authentication_classes([PiAuthentication])
+@permission_classes([IsAuthenticated])
+def get_config_for_display_device(request, serial_id):
+    try:
+        if not serial_id:
+            return Response({"error": "Missing serial_id"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        display_device = request.user.raspberrypi_set.get(serial_id=serial_id)
+        return Response(RasberryPiSerializer(display_device).data)
+    except RaspberryPi.DoesNotExist:
+        return Response({"error": "Display device not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
